@@ -1,0 +1,85 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+#use diagnostics;
+use File::Basename;
+use Getopt::Std;
+use List::Util 'uniq';
+
+$Getopt::Std::STANDARD_HELP_VERSION = 1;
+
+$main::PROGRAM = basename $0;
+$main::VERSION = 0.1;
+
+sub main::HELP_MESSAGE {
+  print <<"EOH";
+Print information about missing ports dependencies.
+usage: $main::PROGRAM [-h] [-v] [-f|-d|-p]
+
+Options:
+  -h   Show this help message and exit
+  -v   Show version and exit
+  -f   Show port with all dependencies and colourize missing in red
+  -d   Show all missing dependencies in one line
+  -p   show all ports that have missing dependencies on one line
+EOH
+}
+
+sub main::VERSION_MESSAGE {
+  print "$main::PROGRAM v$main::VERSION\n";
+}
+
+my %opt;
+getopts('fdp', \%opt) or exit(1);
+
+die "Options -f, -d, -p are mutual exclusive!\n"
+  if (keys %opt) > 1;
+
+my %installed = map { (split /\s+/)[0], 1 } qx(pkginfo -i);
+delete $installed{$_} for map { chomp, $_ } qx(prtorphan);
+
+my @missing_deps  = ();
+my @missing_ports = ();
+
+for my $port (keys %installed) {
+  my %missing = ();
+  my %deps    =
+    map { $_, 1 } map { split /[\s\r\n]+/ } qx(prt-get quickdep $port);
+
+  for my $dep (keys %deps) {
+    next if exists $installed{$dep};
+
+    $missing{$dep}++;
+    push @missing_ports, $port;
+  }
+
+  next unless (keys %missing) > 0;
+
+  if ($opt{d}) {
+    push @missing_deps, (keys %missing);
+    next;
+  } elsif ($opt{p}) {
+    next;
+  } elsif ($opt{f}) {
+    print "$port: ";
+    for my $dep (keys %deps) {
+      print(
+        exists $missing{$dep}
+          ? "\033[0;31m${dep}\033[0m "
+          : "$dep "
+      );
+    }
+    print "\n";
+  } else {
+    print "$port: @{[ keys %missing ]}\n";
+  }
+}
+
+if ($opt{d}) {
+  print "@{[ uniq @missing_deps ]}\n";
+} elsif ($opt{p}) {
+  print "@{[ uniq @missing_ports ]}\n";
+}
+
+# vim:sw=2:ts=2:sts=2:et:cc=72
+# End of file
