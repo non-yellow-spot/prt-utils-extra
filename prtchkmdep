@@ -14,14 +14,14 @@ $main::VERSION = 0.1;
 sub main::HELP_MESSAGE {
   print <<"EOH";
 Print information about missing ports dependencies.
-usage: $main::PROGRAM [-h] [-v] [-f|-d|-p]
+usage: $main::PROGRAM [--help] [--version] [-f|-d|-p]
 
 Options:
-  -h   Show this help message and exit
-  -v   Show version and exit
-  -f   Show port with all dependencies and colourize missing in red
-  -d   Show all missing dependencies in one line
-  -p   show all ports that have missing dependencies on one line
+  --help    Show this help message and exit
+  --version Show version and exit
+  -f        Show port with all dependencies and colorize missing in red
+  -d        Show all missing dependencies in one line
+  -p        Show all ports that have missing dependencies on one line
 EOH
 }
 
