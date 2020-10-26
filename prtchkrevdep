@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+#use diagnostics;
+use Cwd 'realpath';
+use File::Basename;
+use Getopt::Std;
+use List::Util 'uniq';
+
+$Getopt::Std::STANDARD_HELP_VERSION = 1;
+
+$main::PROGRAM = basename $0;
+$main::VERSION = 0.1;
+
+sub main::HELP_MESSAGE {
+  print <<"EOH";
+Display ports which depends on port (by ldd parsing).
+usage: $main::PROGRAM [-h] [-v] [-c] PORT
+
+Options:
+  -h  Show this help message and exit
+  -v  Show version and exit
+  -V  Verbose mode
+  -X  Exclude core dependencies from listing
+
+
+NOTE: $main::PROGRAM parses only binaries from /(usr)?/(bin|sbin)/,
+      so the crap from /opt (or another non-standard path) will be ignored.
+EOH
+}
+
+sub main::VERSION_MESSAGE {
+  print "$main::PROGRAM v$main::VERSION\n";
+}
+
+my %opt;
+getopts('VX', \%opt) or exit(1);
+
+die "$main::PROGRAM: Missing port argument!\n" unless $ARGV[0];
+
+my @depends;
+my @missing;
+my @orphans;
+my @footprint = qx<pkginfo -l $ARGV[0]>;
+
+for my $file (@footprint) {
+  chomp $file;
+  next unless $file =~ m@^(?:usr/)?(?:bin|sbin|lib|lib32)/.+@x;
+  next unless -f "/$file";
+  next if -l "/$file";            # skip links
+  next if $file =~ /\.(?:pc|a)$/; # skip *.a and *.pc files
+
+  print "==> /$file:\n" if $opt{V};
+  my @ldds = grep / => /, qx<ldd /$file>;
+  s/^\s+|\s+$//g for @ldds;
+
+  for my $ldd (@ldds) {
+    my ($name, $path, $realpath, @output);
+
+    if ($ldd =~ /not found/) {
+      $name = (split /\s+/, $ldd)[0];
+      $realpath = $name;
+      @output = qx<prt-cache fsearch $name>;
+
+      printf "%-50s ", $name if $opt{V};
+      if (defined $output[0] && $output[0] =~ m@^Found in (/usr/ports/.*?):$@) {
+        print "$1\n" if $opt{V};
+        push @missing, $1 if defined $1;
+      } else {
+        push @orphans, $name;
+      }
+    } else {
+      ($name, undef, $path, undef) = (split /\s+/, $ldd);
+      $realpath = realpath $path;
+      @output = qx<prt-cache fsearch --full $realpath>;
+
+      printf "%-50s ", $realpath if $opt{V};
+      if (defined($output[0]) && $output[0] =~ m@^Found in (/usr/ports/.*?):$@) {
+        print "$1\n" if $opt{V};
+        push @depends, $1 if defined $1;
+      } else {
+        push @orphans, $name;
+      }
+    }
+  }
+}
+
+sub dumparr (@) {
+  my $title = shift;
+  return unless scalar @_;
+
+  print "\n-- $title\n";
+  for (@_) {
+    next if m/\/usr\/ports\/core\// && $opt{X};
+    print basename($_)."\n";
+  }
+}
+
+dumparr "installed",     sort {$a cmp $b} uniq @depends;
+dumparr "not installed", sort {$a cmp $b} uniq @missing;
+dumparr "orphans",       sort sort uniq @orphans;
+
+# vim:sw=2:ts=2:sts=2:et:cc=80
+# End of file
