@@ -15,13 +15,13 @@ $main::VERSION = 0.1;
 sub main::HELP_MESSAGE {
   print <<"EOH";
 Display ports which depends on port (by ldd parsing).
-usage: $main::PROGRAM [-h] [-v] [-c] PORT
+usage: $main::PROGRAM [--help] [--version] [-V] [-X] PORT
 
 Options:
-  -h  Show this help message and exit
-  -v  Show version and exit
-  -V  Verbose mode
-  -X  Exclude core dependencies from listing
+  --help     show this help message and exit
+  --version  show version and exit
+  -v         serbose mode
+  -x         exclude core dependencies from listing
 
 
 NOTE: $main::PROGRAM parses only binaries from /(usr)?/(bin|sbin)/,
@@ -34,7 +34,7 @@ sub main::VERSION_MESSAGE {
 }
 
 my %opt;
-getopts('VX', \%opt) or exit(1);
+getopts('vx', \%opt) or exit(1);
 
 die "$main::PROGRAM: Missing port argument!\n" unless $ARGV[0];
 
@@ -50,7 +50,7 @@ for my $file (@footprint) {
   next if -l "/$file";            # skip links
   next if $file =~ /\.(?:pc|a)$/; # skip *.a and *.pc files
 
-  print "==> /$file:\n" if $opt{V};
+  print "==> /$file:\n" if $opt{v};
   my @ldds = grep / => /, qx<ldd /$file>;
   s/^\s+|\s+$//g for @ldds;
 
@@ -62,9 +62,9 @@ for my $file (@footprint) {
       $realpath = $name;
       @output = qx<prt-cache fsearch $name>;
 
-      printf "%-50s ", $name if $opt{V};
+      printf "%-50s ", $name if $opt{v};
       if (defined $output[0] && $output[0] =~ m@^Found in (/usr/ports/.*?):$@) {
-        print "$1\n" if $opt{V};
+        print "$1\n" if $opt{v};
         push @missing, $1 if defined $1;
       } else {
         push @orphans, $name;
@@ -74,9 +74,9 @@ for my $file (@footprint) {
       $realpath = realpath $path;
       @output = qx<prt-cache fsearch --full $realpath>;
 
-      printf "%-50s ", $realpath if $opt{V};
+      printf "%-50s ", $realpath if $opt{v};
       if (defined($output[0]) && $output[0] =~ m@^Found in (/usr/ports/.*?):$@) {
-        print "$1\n" if $opt{V};
+        print "$1\n" if $opt{v};
         push @depends, $1 if defined $1;
       } else {
         push @orphans, $name;
@@ -91,14 +91,15 @@ sub dumparr (@) {
 
   print "\n-- $title\n";
   for (@_) {
-    next if m/\/usr\/ports\/core\// && $opt{X};
+    next if m/\/usr\/ports\/core\// && $opt{x};
     print basename($_)."\n";
   }
 }
 
-dumparr "installed",     sort {$a cmp $b} uniq @depends;
-dumparr "not installed", sort {$a cmp $b} uniq @missing;
-dumparr "orphans",       sort sort uniq @orphans;
+dumparr "installed",                            sort {$a cmp $b} uniq @depends;
+dumparr "not installed",                        sort {$a cmp $b} uniq @missing;
+dumparr "orphans (missing in the ports tree)",  sort sort uniq @orphans;
+print "\n";
 
 # vim:sw=2:ts=2:sts=2:et:cc=80
 # End of file
