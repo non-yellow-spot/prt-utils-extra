@@ -1,0 +1,45 @@
+#!/bin/bash
+
+[ -z $1 ] && {
+  argv0=`basename $0`
+  cat <<EOF
+$argv0 -- check optimization flags in port's build log.
+Usage: $argv0 PORT
+
+See /etc/prtchkflagz.conf to set detectable optimization flags.
+EOF
+  exit 1
+}
+
+name=$1
+logdir=$(dirname $(awk '/logfile /{print $2}' /etc/prt-get.conf))
+
+echo "$logdir/$name.log"
+
+perl -MTerm::ANSIColor -lne '
+BEGIN {
+  # get regex conf
+  open my $fh, "/etc/prtchkflagz.conf";
+  while (<$fh>) {
+    chomp;
+    push @regex, $_;
+  }
+  close $fh;
+}
+$catch=0;
+for $regex (@regex) {
+  if (/$regex / ) {
+    $catch++;
+    s/$&/\e[0;91m$&\e[0m/g;
+    $found{$&}=1;
+  }
+}
+print if $catch;
+END {
+  print "\nSummary\n-------";
+  print for keys %found;
+}
+' $logdir/$name.log
+
+# vim:sw=2:ts=2:sts=2:et:cc=72
+# End of file
