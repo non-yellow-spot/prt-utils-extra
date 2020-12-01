@@ -20,7 +20,7 @@ prtverify -m missing-deps \
 
 echo
 echo "- Check for file-conflicts with other ports"
-prtverify -m missing-deps \
+prtverify -m file-conflict \
   -c /usr/ports/compat-32 \
   -c /usr/ports/contrib   \
   -c /usr/ports/core      \
